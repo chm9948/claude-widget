@@ -1,0 +1,63 @@
+# claude-widget
+
+Claude Code 사용량을 데스크톱에 띄워두는 Windows 플로팅 위젯.
+이번 달 누적 비용과 현재 5시간 빌링 블록 상태를 항상 한눈에 볼 수 있습니다.
+
+> 버전: v1.0.0 · 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고
+
+## 화면 구성
+
+- **이번 달 누적 비용** — 큰 숫자로 표시 + 월 배지
+- **모델별 비용 막대** — 모델별 비용 비중을 막대로 표시
+- **현재 빌링 블록** — 진행률 막대, 사용률 %, 블록 종료까지 남은 시간(실시간)
+- **하단 바** — 투명도 슬라이더 · 갱신 카운트다운 · 수동 새로고침(⟳)
+- **ⓘ 정보 패널** — 헤더의 ⓘ 클릭 시 문의 메일·버전 표시 (다시 클릭하면 접힘)
+- **테마 토글** — 라이트/다크 전환(☾/☀)
+
+창은 드래그로 이동할 수 있고 항상 위(Topmost)에 떠 있습니다.
+
+## 실행
+
+```powershell
+# 소스 직접 실행
+powershell -ExecutionPolicy Bypass -File claude-widget.ps1
+
+# 또는 컴파일된 바이너리 실행
+.\claude-widget.exe
+```
+
+## 요구 사항
+
+- Windows + PowerShell 5.1 (Desktop)
+- Node.js / `npx` — 비용 데이터(`ccusage`) 조회용
+- 로그인된 Claude Code — 사용량 API 토큰(`~/.claude/.credentials.json`)을 사용
+
+## 데이터 소스
+
+| 표시 항목 | 출처 |
+|---|---|
+| 월 누적 비용 · 모델별 내역 | `npx ccusage@latest claude monthly --json` |
+| 블록 종료 시각 · 사용률 % | Anthropic `oauth/usage` API의 `five_hour` (= `/usage`와 동일, 브라우저·앱 등 모든 클라이언트 사용량 포함) |
+
+- 사용량 API는 자동 갱신 주기(기본 5분)마다 호출하며, 마지막 성공값을 캐시로 유지합니다.
+- API가 일시적으로 실패(예: 429 rate limit)하면 폴백 공식으로 튀지 않고 캐시값을 계속 표시하며, 일정 시간 후 재시도합니다.
+
+## 구조
+
+단일 파일 WPF 앱(PowerShell). XAML을 인라인 here-string으로 정의하고 `XamlReader`로 로드합니다.
+백그라운드 runspace가 데이터를 조회해 스레드 안전 큐로 UI에 전달하고, UI 스레드의 타이머들이 화면을 갱신합니다.
+자세한 아키텍처는 [CLAUDE.md](CLAUDE.md) 참고.
+
+## 빌드 / 배포
+
+`ps2exe`로 `.ps1`을 `.exe`로 컴파일합니다.
+
+```powershell
+Invoke-ps2exe -inputFile claude-widget.ps1 -outputFile claude-widget.exe -noConsole
+```
+
+버전을 올릴 때는 소스의 `$script:appVersion`, `CHANGELOG.md`, ⓘ 정보 패널의 버전 값을 함께 맞춥니다.
+
+## 만든이
+
+최현민 · 문의: hmchoi@page1.co.kr · GxP Page1

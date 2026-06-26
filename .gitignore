@@ -1,0 +1,13 @@
+# 개발 부산물
+claude-widget.backup.ps1
+claude-widget.zip
+*.zip
+
+# Claude Code 로컬 설정/상태
+.claude/
+
+# OS / 편집기
+Thumbs.db
+Desktop.ini
+.vs/
+*.swp
