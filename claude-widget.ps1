@@ -12,10 +12,14 @@ Add-Type -AssemblyName WindowsBase
   <Border x:Name="RootBorder" CornerRadius="12" BorderThickness="1">
     <StackPanel Margin="18,14,18,14">
 
+      <!-- ===== 전체 보기 ===== -->
+      <StackPanel x:Name="FullView">
+
       <!-- 헤더 -->
       <Grid Margin="0,0,0,10">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
@@ -31,11 +35,18 @@ Add-Type -AssemblyName WindowsBase
                 Background="Transparent" BorderThickness="0"
                 FontSize="12" Cursor="Hand" Width="18" Height="18"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+        <Ellipse x:Name="InfoDot" Grid.Column="2" Width="6" Height="6" Fill="#E5484D"
+                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,0,0"
+                 IsHitTestVisible="False" Visibility="Collapsed"/>
         <Button x:Name="ThemeBtn" Grid.Column="3"
                 Background="Transparent" BorderThickness="0"
                 FontSize="11" Cursor="Hand" Width="18" Height="18"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
-        <Button x:Name="CloseBtn" Grid.Column="4" Content="&#x00D7;"
+        <Button x:Name="MinBtn" Grid.Column="4" Content="&#x2013;"
+                Background="Transparent" BorderThickness="0"
+                FontSize="14" Cursor="Hand" Width="18" Height="18"
+                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+        <Button x:Name="CloseBtn" Grid.Column="5" Content="&#x00D7;"
                 Background="Transparent" BorderThickness="0"
                 FontSize="14" Cursor="Hand" Width="18" Height="18"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
@@ -53,6 +64,7 @@ Add-Type -AssemblyName WindowsBase
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
           <TextBlock Grid.Row="0" Grid.Column="0" Text="문의" Opacity="0.6"
                      FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,3"/>
@@ -66,9 +78,20 @@ Add-Type -AssemblyName WindowsBase
                        TextDecorations="Underline">버그 신고·건의</Hyperlink>
           </TextBlock>
           <TextBlock Grid.Row="2" Grid.Column="0" Text="버전" Opacity="0.6"
-                     FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,0"/>
+                     FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,3"/>
           <TextBlock x:Name="InfoVersion" Grid.Row="2" Grid.Column="1" Text="v1.0.0" FontWeight="SemiBold"
-                     FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,0"/>
+                     FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,3"/>
+          <TextBlock x:Name="DownloadLabel" Grid.Row="3" Grid.Column="0" Text="최신" Opacity="0.6"
+                     Visibility="Collapsed"
+                     FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,0"/>
+          <StackPanel x:Name="DownloadValue" Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
+                      Visibility="Collapsed" Margin="0,0,0,0">
+            <Ellipse Width="6" Height="6" Fill="#E5484D" VerticalAlignment="Center" Margin="0,0,5,0"/>
+            <TextBlock FontWeight="SemiBold" FontSize="10" FontFamily="Segoe UI">
+              <Hyperlink x:Name="DownloadLink" NavigateUri="https://github.com/chm9948/claude-widget/raw/main/claude-widget.exe"
+                         TextDecorations="Underline">다운로드</Hyperlink>
+            </TextBlock>
+          </StackPanel>
         </Grid>
       </Border>
 
@@ -133,6 +156,26 @@ Add-Type -AssemblyName WindowsBase
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
       </Grid>
 
+      </StackPanel>
+      <!-- ===== 최소화 보기 (한 줄) ===== -->
+      <Grid x:Name="CompactView" Visibility="Collapsed">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="CompactCost" Grid.Column="0" Text="..." FontSize="18" FontWeight="Black"
+                   FontFamily="Segoe UI" VerticalAlignment="Center"/>
+        <Button x:Name="RestoreBtn" Grid.Column="1" Content="&#x25A2;"
+                Background="Transparent" BorderThickness="0"
+                FontSize="13" Cursor="Hand" Width="18" Height="18" Margin="6,0,0,0"
+                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+        <Button x:Name="CompactCloseBtn" Grid.Column="2" Content="&#x00D7;"
+                Background="Transparent" BorderThickness="0"
+                FontSize="14" Cursor="Hand" Width="18" Height="18"
+                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+      </Grid>
+
     </StackPanel>
   </Border>
 </Window>
@@ -169,7 +212,7 @@ $script:themes = @{
 $script:isDark       = $false
 $script:currentData  = $null
 $script:blockEndTime = $null
-$script:appVersion   = "v1.1.0"   # 변경 시 CHANGELOG.md 에 항목 추가
+$script:appVersion   = "v1.3.0"   # 변경 시 CHANGELOG.md 에 항목 추가
 
 # ── 윈도우 초기화 ────────────────────────────────────────────────────────────
 $reader              = [System.Xml.XmlNodeReader]::new($xamlDoc)
@@ -191,11 +234,21 @@ $script:blockPct      = $script:win.FindName("BlockPct")
 $script:footerText   = $script:win.FindName("FooterText")
 $script:themeBtn     = $script:win.FindName("ThemeBtn")
 $script:closeBtn     = $script:win.FindName("CloseBtn")
+$script:fullView     = $script:win.FindName("FullView")
+$script:compactView  = $script:win.FindName("CompactView")
+$script:compactCost  = $script:win.FindName("CompactCost")
+$script:minBtn       = $script:win.FindName("MinBtn")
+$script:restoreBtn   = $script:win.FindName("RestoreBtn")
+$script:compactCloseBtn = $script:win.FindName("CompactCloseBtn")
 $script:infoBtn      = $script:win.FindName("InfoBtn")
 $script:infoPanel    = $script:win.FindName("InfoPanel")
 $script:infoGrid     = $script:win.FindName("InfoGrid")
 $script:infoVersion  = $script:win.FindName("InfoVersion")
 $script:issueLink    = $script:win.FindName("IssueLink")
+$script:downloadLink = $script:win.FindName("DownloadLink")
+$script:downloadLabel = $script:win.FindName("DownloadLabel")
+$script:downloadValue = $script:win.FindName("DownloadValue")
+$script:infoDot       = $script:win.FindName("InfoDot")
 $script:refreshBtn   = $script:win.FindName("RefreshBtn")
 $script:opacitySlider= $script:win.FindName("OpacitySlider")
 
@@ -203,6 +256,20 @@ $script:infoVersion.Text = $script:appVersion
 
 $script:win.Add_MouseLeftButtonDown({ $script:win.DragMove() })
 $script:closeBtn.Add_Click({ $script:win.Close() })
+
+# 최소화: 금액만 한 줄로 / 복원
+$script:minBtn.Add_Click({
+    $script:fullView.Visibility    = [System.Windows.Visibility]::Collapsed
+    $script:compactView.Visibility = [System.Windows.Visibility]::Visible
+    $script:win.Width = 170
+})
+$script:restoreBtn.Add_Click({
+    $script:compactView.Visibility = [System.Windows.Visibility]::Collapsed
+    $script:fullView.Visibility    = [System.Windows.Visibility]::Visible
+    $script:win.Width = 272
+})
+$script:compactCloseBtn.Add_Click({ $script:win.Close() })
+
 $script:infoBtn.Add_Click({
     if ($script:infoPanel.Visibility -eq [System.Windows.Visibility]::Visible) {
         $script:infoPanel.Visibility = [System.Windows.Visibility]::Collapsed
@@ -210,12 +277,14 @@ $script:infoBtn.Add_Click({
         $script:infoPanel.Visibility = [System.Windows.Visibility]::Visible
     }
 })
-# 이슈 링크 클릭 시 기본 브라우저로 열기
-$script:issueLink.Add_RequestNavigate({
+# 이슈/다운로드 링크 클릭 시 기본 브라우저로 열기
+$openLink = {
     param($s, $e)
     try { Start-Process $e.Uri.AbsoluteUri } catch {}
     $e.Handled = $true
-})
+}
+$script:issueLink.Add_RequestNavigate($openLink)
+$script:downloadLink.Add_RequestNavigate($openLink)
 
 $wa = [System.Windows.SystemParameters]::WorkArea
 $script:win.Left = $wa.Right  - 292
@@ -223,6 +292,21 @@ $script:win.Top  = $wa.Bottom - 240
 
 # ── 테마 적용 ────────────────────────────────────────────────────────────────
 function ConvertTo-Brush { param([string]$h) [System.Windows.Media.BrushConverter]::new().ConvertFrom($h) }
+
+# latest 가 current 보다 새 버전이면 $true (v1.10.0 > v1.9.0 처럼 숫자 비교)
+function Test-NewerVersion {
+    param([string]$current, [string]$latest)
+    if (-not $latest) { return $false }
+    $c = ($current -replace '[^\d.]', '').Split('.')
+    $l = ($latest  -replace '[^\d.]', '').Split('.')
+    for ($i = 0; $i -lt 3; $i++) {
+        $cv = if ($i -lt $c.Count -and $c[$i] -ne '') { [int]$c[$i] } else { 0 }
+        $lv = if ($i -lt $l.Count -and $l[$i] -ne '') { [int]$l[$i] } else { 0 }
+        if ($lv -gt $cv) { return $true }
+        if ($lv -lt $cv) { return $false }
+    }
+    return $false
+}
 
 function Apply-Theme {
     param([hashtable]$t)
@@ -239,8 +323,13 @@ function Apply-Theme {
     $script:infoPanel.BorderBrush      = ConvertTo-Brush $t.borderStroke
     [System.Windows.Documents.TextElement]::SetForeground($script:infoGrid, (ConvertTo-Brush $t.blockCostFg))
     $script:issueLink.Foreground       = ConvertTo-Brush $t.modelCost
+    $script:downloadLink.Foreground    = ConvertTo-Brush $t.modelCost
     $script:costText.Foreground        = ConvertTo-Brush $t.cost
     $script:subtitleText.Foreground    = ConvertTo-Brush $t.subtitle
+    $script:minBtn.Foreground          = ConvertTo-Brush $t.buttons
+    $script:compactCost.Foreground     = ConvertTo-Brush $t.cost
+    $script:restoreBtn.Foreground      = ConvertTo-Brush $t.buttons
+    $script:compactCloseBtn.Foreground = ConvertTo-Brush $t.buttons
     $script:blockSection.Background    = ConvertTo-Brush $t.blockBg
     $script:blockLabel.Foreground      = ConvertTo-Brush $t.blockLabel
     $script:blockCost.Foreground       = ConvertTo-Brush $t.blockCostFg
@@ -305,7 +394,8 @@ function Update-Display {
     if (-not $cur) { $cur = $data.monthlyData.monthly | Select-Object -Last 1 }
 
     $script:monthText.Text = $cur.month
-    $script:costText.Text  = '$' + [string]::Format("{0:F2}", $cur.totalCost)
+    $script:costText.Text    = '$' + [string]::Format("{0:F2}", $cur.totalCost)
+    $script:compactCost.Text = $script:costText.Text
     $script:modelsPanel.Children.Clear()
     $total = [double]$cur.totalCost
     foreach ($m in $cur.modelBreakdowns) {
@@ -356,6 +446,24 @@ function Update-Display {
         }
     } catch {}
 
+    # 최신 버전 확인: 저장소 버전이 현재보다 새로우면 "최신" 다운로드 행 표시
+    try {
+        $latest = [string]$data.latestVersion
+        if ($latest -and (Test-NewerVersion $script:appVersion $latest)) {
+            $script:downloadLink.Inlines.Clear()
+            $script:downloadLink.Inlines.Add([System.Windows.Documents.Run]::new("$latest 다운로드"))
+            $script:downloadLabel.Visibility = [System.Windows.Visibility]::Visible
+            $script:downloadValue.Visibility = [System.Windows.Visibility]::Visible
+            $script:infoDot.Visibility       = [System.Windows.Visibility]::Visible
+            $script:infoVersion.Text = $script:appVersion
+        } else {
+            $script:downloadLabel.Visibility = [System.Windows.Visibility]::Collapsed
+            $script:downloadValue.Visibility = [System.Windows.Visibility]::Collapsed
+            $script:infoDot.Visibility       = [System.Windows.Visibility]::Collapsed
+            $script:infoVersion.Text = if ($latest) { "$($script:appVersion) (최신)" } else { $script:appVersion }
+        }
+    } catch {}
+
     $script:isRefreshing  = $false
     $script:lastUpdated   = (Get-Date).ToString("HH:mm:ss")
     $script:nextRefreshAt = [DateTime]::Now.AddSeconds(300)
@@ -394,6 +502,8 @@ $script:bgPs.Runspace = $script:bgRunspace
     $cachedEndIso    = $null                  # 블록 종료 시각(ISO).
     $cachedPct       = $null                  # 사용률 %.
     $apiBlockedUntil = [DateTime]::MinValue    # 429 백오프 해제 시각(UTC).
+    $cachedLatestVer = $null                  # 저장소 최신 버전(CHANGELOG 최상단).
+    $lastVerCheck    = [DateTime]::MinValue    # 마지막 버전 확인 시각(UTC) — 1시간 주기.
     while ($true) {
         $cli = $cliSel[0]
         try {
@@ -437,11 +547,24 @@ $script:bgPs.Runspace = $script:bgRunspace
                 # 캐시값을 표시값으로 사용(성공이든 실패든 마지막으로 알던 정확한 값).
                 $actualEndIso = $cachedEndIso
                 $apiPct       = $cachedPct
+
+                # 저장소 최신 버전(public raw CHANGELOG 최상단 ## [vX.Y.Z]) 조회 — 1시간 주기
+                # (성공하면 1시간 뒤 재확인, 실패하면 다음 사이클에 재시도)
+                if (([DateTime]::UtcNow - $lastVerCheck).TotalMinutes -ge 60) {
+                    try {
+                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                        $clRaw = Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/chm9948/claude-widget/main/CHANGELOG.md' -TimeoutSec 15
+                        $lastVerCheck = [DateTime]::UtcNow
+                        $vm = [regex]::Match([string]$clRaw, '\[(v\d+\.\d+\.\d+)\]')
+                        if ($vm.Success) { $cachedLatestVer = $vm.Groups[1].Value }
+                    } catch {}
+                }
             }
 
             if ($monthly -and $blocks) {
                 $extra = if ($actualEndIso) { ',"apiBlockEndUtc":"' + $actualEndIso + '"' } else { '' }
                 if ($null -ne $apiPct) { $extra += ',"apiBlockPct":' + $apiPct }
+                if ($cachedLatestVer) { $extra += ',"latestVersion":"' + $cachedLatestVer + '"' }
                 $q.Enqueue('{"monthlyData":' + $monthly + ',"blocksData":' + $blocks + $extra + '}')
             }
         } catch {}
