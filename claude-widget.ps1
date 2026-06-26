@@ -52,14 +52,22 @@ Add-Type -AssemblyName WindowsBase
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
           <TextBlock Grid.Row="0" Grid.Column="0" Text="문의" Opacity="0.6"
                      FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,3"/>
           <TextBlock Grid.Row="0" Grid.Column="1" Text="hmchoi@page1.co.kr" FontWeight="SemiBold"
                      FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,3"/>
-          <TextBlock Grid.Row="1" Grid.Column="0" Text="버전" Opacity="0.6"
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="이슈" Opacity="0.6"
+                     FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,3"/>
+          <TextBlock Grid.Row="1" Grid.Column="1" FontWeight="SemiBold"
+                     FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,3">
+            <Hyperlink x:Name="IssueLink" NavigateUri="https://github.com/chm9948/claude-widget/issues"
+                       TextDecorations="Underline">버그 신고·건의</Hyperlink>
+          </TextBlock>
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="버전" Opacity="0.6"
                      FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,0"/>
-          <TextBlock x:Name="InfoVersion" Grid.Row="1" Grid.Column="1" Text="v1.0.0" FontWeight="SemiBold"
+          <TextBlock x:Name="InfoVersion" Grid.Row="2" Grid.Column="1" Text="v1.0.0" FontWeight="SemiBold"
                      FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,0"/>
         </Grid>
       </Border>
@@ -161,7 +169,7 @@ $script:themes = @{
 $script:isDark       = $false
 $script:currentData  = $null
 $script:blockEndTime = $null
-$script:appVersion   = "v1.0.0"   # 변경 시 CHANGELOG.md 에 항목 추가
+$script:appVersion   = "v1.1.0"   # 변경 시 CHANGELOG.md 에 항목 추가
 
 # ── 윈도우 초기화 ────────────────────────────────────────────────────────────
 $reader              = [System.Xml.XmlNodeReader]::new($xamlDoc)
@@ -187,6 +195,7 @@ $script:infoBtn      = $script:win.FindName("InfoBtn")
 $script:infoPanel    = $script:win.FindName("InfoPanel")
 $script:infoGrid     = $script:win.FindName("InfoGrid")
 $script:infoVersion  = $script:win.FindName("InfoVersion")
+$script:issueLink    = $script:win.FindName("IssueLink")
 $script:refreshBtn   = $script:win.FindName("RefreshBtn")
 $script:opacitySlider= $script:win.FindName("OpacitySlider")
 
@@ -200,6 +209,12 @@ $script:infoBtn.Add_Click({
     } else {
         $script:infoPanel.Visibility = [System.Windows.Visibility]::Visible
     }
+})
+# 이슈 링크 클릭 시 기본 브라우저로 열기
+$script:issueLink.Add_RequestNavigate({
+    param($s, $e)
+    try { Start-Process $e.Uri.AbsoluteUri } catch {}
+    $e.Handled = $true
 })
 
 $wa = [System.Windows.SystemParameters]::WorkArea
@@ -223,6 +238,7 @@ function Apply-Theme {
     $script:infoPanel.Background       = ConvertTo-Brush $t.blockBg
     $script:infoPanel.BorderBrush      = ConvertTo-Brush $t.borderStroke
     [System.Windows.Documents.TextElement]::SetForeground($script:infoGrid, (ConvertTo-Brush $t.blockCostFg))
+    $script:issueLink.Foreground       = ConvertTo-Brush $t.modelCost
     $script:costText.Foreground        = ConvertTo-Brush $t.cost
     $script:subtitleText.Foreground    = ConvertTo-Brush $t.subtitle
     $script:blockSection.Background    = ConvertTo-Brush $t.blockBg
