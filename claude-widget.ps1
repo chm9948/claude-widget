@@ -75,7 +75,7 @@ Add-Type -AssemblyName WindowsBase
           <TextBlock Grid.Row="1" Grid.Column="1" FontWeight="SemiBold"
                      FontSize="10" FontFamily="Segoe UI" Margin="0,0,0,3">
             <Hyperlink x:Name="IssueLink" NavigateUri="https://github.com/chm9948/claude-widget/issues"
-                       TextDecorations="Underline">버그 신고·건의</Hyperlink>
+                       TextDecorations="Underline">버그 신고·개선·건의</Hyperlink>
           </TextBlock>
           <TextBlock Grid.Row="2" Grid.Column="0" Text="버전" Opacity="0.6"
                      FontSize="10" FontFamily="Malgun Gothic" Margin="0,0,10,3"/>
@@ -212,7 +212,7 @@ $script:themes = @{
 $script:isDark       = $false
 $script:currentData  = $null
 $script:blockEndTime = $null
-$script:appVersion   = "v1.3.0"   # 변경 시 CHANGELOG.md 에 항목 추가
+$script:appVersion   = "v1.3.1"   # 변경 시 CHANGELOG.md 에 항목 추가
 
 # ── 윈도우 초기화 ────────────────────────────────────────────────────────────
 $reader              = [System.Xml.XmlNodeReader]::new($xamlDoc)
