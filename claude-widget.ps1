@@ -1,13 +1,15 @@
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
 [xml]$xamlDoc = @"
 <Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Width="272" SizeToContent="Height"
-    WindowStyle="None" AllowsTransparency="True"
+    WindowStyle="None" AllowsTransparency="True" ShowInTaskbar="False"
     Background="Transparent" Topmost="True" ResizeMode="NoResize">
   <Border x:Name="RootBorder" CornerRadius="12" BorderThickness="1">
     <StackPanel Margin="18,14,18,14">
@@ -32,23 +34,28 @@ Add-Type -AssemblyName WindowsBase
           <TextBlock x:Name="MonthText" FontSize="9" FontWeight="Bold" FontFamily="Segoe UI"/>
         </Border>
         <Button x:Name="InfoBtn" Grid.Column="2" Content="&#x24D8;"
-                Background="Transparent" BorderThickness="0"
-                FontSize="12" Cursor="Hand" Width="18" Height="18"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                FontFamily="Segoe UI Symbol" FontSize="12" Cursor="Hand"
+                Width="20" Height="20" VerticalAlignment="Center"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
         <Ellipse x:Name="InfoDot" Grid.Column="2" Width="6" Height="6" Fill="#E5484D"
-                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,0,0"
+                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,1,0"
                  IsHitTestVisible="False" Visibility="Collapsed"/>
         <Button x:Name="ThemeBtn" Grid.Column="3"
-                Background="Transparent" BorderThickness="0"
-                FontSize="11" Cursor="Hand" Width="18" Height="18"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                FontFamily="Segoe UI Symbol" FontSize="12" Cursor="Hand"
+                Width="20" Height="20" VerticalAlignment="Center"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
-        <Button x:Name="MinBtn" Grid.Column="4" Content="&#x2013;"
-                Background="Transparent" BorderThickness="0"
-                FontSize="14" Cursor="Hand" Width="18" Height="18"
-                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
-        <Button x:Name="CloseBtn" Grid.Column="5" Content="&#x00D7;"
-                Background="Transparent" BorderThickness="0"
-                FontSize="14" Cursor="Hand" Width="18" Height="18"
+        <Button x:Name="MinBtn" Grid.Column="4" Content="&#x2303;"
+                Background="Transparent" BorderThickness="0" Padding="0,2,0,0"
+                FontFamily="Segoe UI Symbol" FontSize="12" Cursor="Hand"
+                Width="20" Height="20" VerticalAlignment="Center"
+                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                ToolTip="한 줄로 접기"/>
+        <Button x:Name="CloseBtn" Grid.Column="5" Content="&#x2715;"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                FontFamily="Segoe UI Symbol" FontSize="13" Cursor="Hand"
+                Width="20" Height="20" VerticalAlignment="Center"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
       </Grid>
 
@@ -166,13 +173,14 @@ Add-Type -AssemblyName WindowsBase
         </Grid.ColumnDefinitions>
         <TextBlock x:Name="CompactCost" Grid.Column="0" Text="..." FontSize="18" FontWeight="Black"
                    FontFamily="Segoe UI" VerticalAlignment="Center"/>
-        <Button x:Name="RestoreBtn" Grid.Column="1" Content="&#x25A2;"
+        <Button x:Name="RestoreBtn" Grid.Column="1" Content="&#x2304;"
                 Background="Transparent" BorderThickness="0"
                 FontSize="13" Cursor="Hand" Width="18" Height="18" Margin="6,0,0,0"
-                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
-        <Button x:Name="CompactCloseBtn" Grid.Column="2" Content="&#x00D7;"
+                VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                ToolTip="펼치기"/>
+        <Button x:Name="CompactCloseBtn" Grid.Column="2" Content="&#x2715;"
                 Background="Transparent" BorderThickness="0"
-                FontSize="14" Cursor="Hand" Width="18" Height="18"
+                FontFamily="Segoe UI Symbol" FontSize="13" Cursor="Hand" Width="18" Height="18"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
       </Grid>
 
@@ -212,7 +220,7 @@ $script:themes = @{
 $script:isDark       = $false
 $script:currentData  = $null
 $script:blockEndTime = $null
-$script:appVersion   = "v1.3.1"   # 변경 시 CHANGELOG.md 에 항목 추가
+$script:appVersion   = "v1.4.0"   # 변경 시 CHANGELOG.md 에 항목 추가
 
 # ── 윈도우 초기화 ────────────────────────────────────────────────────────────
 $reader              = [System.Xml.XmlNodeReader]::new($xamlDoc)
@@ -464,7 +472,8 @@ function Update-Display {
         }
     } catch {}
 
-    $script:isRefreshing  = $false
+    $script:isRefreshing       = $false
+    $script:firstDataReceived  = $true
     $script:lastUpdated   = (Get-Date).ToString("HH:mm:ss")
     $script:nextRefreshAt = [DateTime]::Now.AddSeconds(300)
 }
@@ -593,15 +602,18 @@ $script:pollTimer.Add_Tick({
 $script:pollTimer.Start()
 
 # ── 카운트다운 타이머 (1초) ──────────────────────────────────────────────────
-$script:lastUpdated   = ""
-$script:nextRefreshAt = [DateTime]::Now.AddSeconds(60)
-$script:isRefreshing  = $false
+$script:lastUpdated       = ""
+$script:nextRefreshAt     = [DateTime]::Now.AddSeconds(60)
+$script:isRefreshing      = $false
+$script:firstDataReceived = $false
 
 $script:countdownTimer = [System.Windows.Threading.DispatcherTimer]::new()
 $script:countdownTimer.Interval = [TimeSpan]::FromSeconds(1)
 $script:countdownTimer.Add_Tick({
     # 갱신 카운트다운
-    if ($script:isRefreshing) {
+    if (-not $script:firstDataReceived) {
+        $script:footerText.Text = "불러오는 중…"
+    } elseif ($script:isRefreshing) {
         $script:footerText.Text = "갱신 중..."
     } else {
         $secs = [int]([DateTime]$script:nextRefreshAt - [DateTime]::Now).TotalSeconds
@@ -627,14 +639,65 @@ $script:countdownTimer.Add_Tick({
 })
 $script:countdownTimer.Start()
 
+# ── 시스템 트레이 아이콘 ─────────────────────────────────────────────────────
+function Show-Widget {
+    $script:win.Show()
+    $script:win.Topmost = $true
+    [void]$script:win.Activate()
+}
+function Hide-Widget { $script:win.Hide() }
+
+# 트레이 아이콘 이미지: 동봉 .ico → exe 임베드 아이콘 → 기본 아이콘 순으로 로드
+$script:trayIcon = $null
+try {
+    $exePath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $icoFile = [System.IO.Path]::Combine([System.IO.Path]::GetDirectoryName($exePath), 'claude-widget.ico')
+    if (Test-Path $icoFile) { $script:trayIcon = New-Object System.Drawing.Icon($icoFile) }
+    elseif ($exePath -match 'claude-widget') { $script:trayIcon = [System.Drawing.Icon]::ExtractAssociatedIcon($exePath) }
+} catch {}
+if (-not $script:trayIcon) { $script:trayIcon = [System.Drawing.SystemIcons]::Application }
+
+$script:notify = New-Object System.Windows.Forms.NotifyIcon
+$script:notify.Icon = $script:trayIcon
+$script:notify.Text = "Claude 사용량 위젯"
+$script:notify.Visible = $true
+
+$script:trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
+$miShow = $script:trayMenu.Items.Add("열기")
+$miHide = $script:trayMenu.Items.Add("숨기기")
+[void]$script:trayMenu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+$miExit = $script:trayMenu.Items.Add("종료")
+$script:notify.ContextMenuStrip = $script:trayMenu
+
+$miShow.add_Click({ Show-Widget })
+$miHide.add_Click({ Hide-Widget })
+$miExit.add_Click({ $script:win.Close() })
+# 트레이 아이콘 좌클릭 → 표시/숨김 토글
+$script:notify.add_MouseClick({
+    param($s, $e)
+    if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        if ($script:win.IsVisible) { Hide-Widget } else { Show-Widget }
+    }
+})
+
 $script:win.Add_Closed({
     $script:pollTimer.Stop()
     $script:countdownTimer.Stop()
     $script:triggerQueue.Enqueue("stop")
     $script:bgPs.Stop()
     $script:bgRunspace.Close()
+    # 트레이 아이콘 정리 (안 하면 유령 아이콘이 남음)
+    if ($script:notify) { $script:notify.Visible = $false; $script:notify.Dispose() }
 })
 
 $script:costText.Text   = "로딩 중..."
-$script:footerText.Text = ""
-$script:win.ShowDialog() | Out-Null
+$script:footerText.Text = "불러오는 중…"
+
+# Application.Run 으로 실행 (ShowDialog 모달이면 트레이에서 Show/Hide 가 막혀 예외 발생)
+if ([System.Windows.Application]::Current) {
+    $script:app = [System.Windows.Application]::Current
+} else {
+    $script:app = New-Object System.Windows.Application
+}
+$script:app.ShutdownMode = [System.Windows.ShutdownMode]::OnLastWindowClose
+[void]$script:app.Run($script:win)

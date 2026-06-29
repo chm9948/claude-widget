@@ -5,6 +5,12 @@
 
 형식: [Keep a Changelog](https://keepachangelog.com/) 약식 · 날짜는 KST 기준.
 
+## [v1.4.0] - 2026-06-29
+
+### Added
+- 시스템 트레이 아이콘 — 트레이에 상주. 좌클릭으로 위젯 표시/숨김 토글, 우클릭 메뉴(열기/숨기기/종료). 작업표시줄에는 표시하지 않음(`ShowInTaskbar=False`).
+- 전용 앱 아이콘(`claude-widget.ico`) — 인디고 라운드 사각형 + "$". exe·트레이·작업표시줄에 적용.
+
 ## [v1.3.1] - 2026-06-26
 
 ### Changed
