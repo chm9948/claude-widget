@@ -46,12 +46,12 @@ Add-Type -AssemblyName System.Drawing
                 FontFamily="Segoe UI Symbol" FontSize="12" Cursor="Hand"
                 Width="20" Height="20" VerticalAlignment="Center"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
-        <Button x:Name="MinBtn" Grid.Column="4" Content="&#x2303;"
-                Background="Transparent" BorderThickness="0" Padding="0,2,0,0"
-                FontFamily="Segoe UI Symbol" FontSize="12" Cursor="Hand"
+        <Button x:Name="MinBtn" Grid.Column="4" Content="&#xE921;"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                FontFamily="Segoe MDL2 Assets" FontSize="10" Cursor="Hand"
                 Width="20" Height="20" VerticalAlignment="Center"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
-                ToolTip="한 줄로 접기"/>
+                ToolTip="한 줄로 최소화"/>
         <Button x:Name="CloseBtn" Grid.Column="5" Content="&#x2715;"
                 Background="Transparent" BorderThickness="0" Padding="0"
                 FontFamily="Segoe UI Symbol" FontSize="13" Cursor="Hand"
@@ -171,13 +171,18 @@ Add-Type -AssemblyName System.Drawing
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <TextBlock x:Name="CompactCost" Grid.Column="0" Text="..." FontSize="18" FontWeight="Black"
-                   FontFamily="Segoe UI" VerticalAlignment="Center"/>
-        <Button x:Name="RestoreBtn" Grid.Column="1" Content="&#x2304;"
-                Background="Transparent" BorderThickness="0"
-                FontSize="13" Cursor="Hand" Width="18" Height="18" Margin="6,0,0,0"
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock x:Name="CompactCost" Text="..." FontSize="18" FontWeight="Black"
+                     FontFamily="Segoe UI" VerticalAlignment="Center"/>
+          <TextBlock x:Name="CompactPct" FontSize="12" FontWeight="SemiBold"
+                     FontFamily="Segoe UI" VerticalAlignment="Center" Margin="8,2,0,0"/>
+        </StackPanel>
+        <Button x:Name="RestoreBtn" Grid.Column="1" Content="&#xE923;"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                FontFamily="Segoe MDL2 Assets" FontSize="10" Cursor="Hand"
+                Width="18" Height="18" Margin="6,0,0,0"
                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
-                ToolTip="펼치기"/>
+                ToolTip="복원"/>
         <Button x:Name="CompactCloseBtn" Grid.Column="2" Content="&#x2715;"
                 Background="Transparent" BorderThickness="0"
                 FontFamily="Segoe UI Symbol" FontSize="13" Cursor="Hand" Width="18" Height="18"
@@ -220,7 +225,7 @@ $script:themes = @{
 $script:isDark       = $false
 $script:currentData  = $null
 $script:blockEndTime = $null
-$script:appVersion   = "v1.4.0"   # 변경 시 CHANGELOG.md 에 항목 추가
+$script:appVersion   = "v1.5.0"   # 변경 시 CHANGELOG.md 에 항목 추가
 
 # ── 윈도우 초기화 ────────────────────────────────────────────────────────────
 $reader              = [System.Xml.XmlNodeReader]::new($xamlDoc)
@@ -245,6 +250,7 @@ $script:closeBtn     = $script:win.FindName("CloseBtn")
 $script:fullView     = $script:win.FindName("FullView")
 $script:compactView  = $script:win.FindName("CompactView")
 $script:compactCost  = $script:win.FindName("CompactCost")
+$script:compactPct   = $script:win.FindName("CompactPct")
 $script:minBtn       = $script:win.FindName("MinBtn")
 $script:restoreBtn   = $script:win.FindName("RestoreBtn")
 $script:compactCloseBtn = $script:win.FindName("CompactCloseBtn")
@@ -263,20 +269,25 @@ $script:opacitySlider= $script:win.FindName("OpacitySlider")
 $script:infoVersion.Text = $script:appVersion
 
 $script:win.Add_MouseLeftButtonDown({ $script:win.DragMove() })
-$script:closeBtn.Add_Click({ $script:win.Close() })
+# X 버튼 → 트레이로 숨김 (완전 종료는 트레이 메뉴 '종료')
+$script:closeBtn.Add_Click({ Hide-Widget })
 
-# 최소화: 금액만 한 줄로 / 복원
+# 최소화: 금액만 한 줄로 / 복원 (우측 상단 기준 — 오른쪽 가장자리 고정)
 $script:minBtn.Add_Click({
+    $right = $script:win.Left + $script:win.ActualWidth
     $script:fullView.Visibility    = [System.Windows.Visibility]::Collapsed
     $script:compactView.Visibility = [System.Windows.Visibility]::Visible
-    $script:win.Width = 170
+    $script:win.Width = 220
+    $script:win.Left  = $right - 220
 })
 $script:restoreBtn.Add_Click({
+    $right = $script:win.Left + $script:win.ActualWidth
     $script:compactView.Visibility = [System.Windows.Visibility]::Collapsed
     $script:fullView.Visibility    = [System.Windows.Visibility]::Visible
     $script:win.Width = 272
+    $script:win.Left  = $right - 272
 })
-$script:compactCloseBtn.Add_Click({ $script:win.Close() })
+$script:compactCloseBtn.Add_Click({ Hide-Widget })
 
 $script:infoBtn.Add_Click({
     if ($script:infoPanel.Visibility -eq [System.Windows.Visibility]::Visible) {
@@ -336,6 +347,7 @@ function Apply-Theme {
     $script:subtitleText.Foreground    = ConvertTo-Brush $t.subtitle
     $script:minBtn.Foreground          = ConvertTo-Brush $t.buttons
     $script:compactCost.Foreground     = ConvertTo-Brush $t.cost
+    $script:compactPct.Foreground      = ConvertTo-Brush $t.blockRemFg
     $script:restoreBtn.Foreground      = ConvertTo-Brush $t.buttons
     $script:compactCloseBtn.Foreground = ConvertTo-Brush $t.buttons
     $script:blockSection.Background    = ConvertTo-Brush $t.blockBg
@@ -447,9 +459,11 @@ function Update-Display {
             $script:blockBarGrid.ColumnDefinitions[0].Width = [System.Windows.GridLength]::new($filled, [System.Windows.GridUnitType]::Star)
             $script:blockBarGrid.ColumnDefinitions[1].Width = [System.Windows.GridLength]::new($empty,  [System.Windows.GridUnitType]::Star)
             $script:blockPct.Text = "$pct%"
+            $script:compactPct.Text = "$pct%"
             $script:blockSection.Visibility = [System.Windows.Visibility]::Visible
         } else {
             $script:blockEndTime = $null
+            $script:compactPct.Text = ""
             $script:blockSection.Visibility = [System.Windows.Visibility]::Collapsed
         }
     } catch {}
@@ -464,11 +478,13 @@ function Update-Display {
             $script:downloadValue.Visibility = [System.Windows.Visibility]::Visible
             $script:infoDot.Visibility       = [System.Windows.Visibility]::Visible
             $script:infoVersion.Text = $script:appVersion
+            if ($script:notify) { $script:notify.Icon = $script:trayIconDot }   # 트레이에도 빨간 점
         } else {
             $script:downloadLabel.Visibility = [System.Windows.Visibility]::Collapsed
             $script:downloadValue.Visibility = [System.Windows.Visibility]::Collapsed
             $script:infoDot.Visibility       = [System.Windows.Visibility]::Collapsed
             $script:infoVersion.Text = if ($latest) { "$($script:appVersion) (최신)" } else { $script:appVersion }
+            if ($script:notify) { $script:notify.Icon = $script:trayIcon }
         }
     } catch {}
 
@@ -657,20 +673,56 @@ try {
 } catch {}
 if (-not $script:trayIcon) { $script:trayIcon = [System.Drawing.SystemIcons]::Application }
 
+# 새 버전 알림용: 기본 아이콘에 빨간 점을 그린 변형 아이콘 생성
+$script:trayIconDot = $script:trayIcon
+try {
+    $bmp = $script:trayIcon.ToBitmap()
+    $gd  = [System.Drawing.Graphics]::FromImage($bmp)
+    $gd.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $dd = [int]($bmp.Width * 0.46)
+    $dx = $bmp.Width - $dd; $dy = 0
+    $redBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 0xE5, 0x48, 0x4D))
+    $whitePen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White, [single]([math]::Max(1, $bmp.Width * 0.05)))
+    $gd.FillEllipse($redBrush, $dx, $dy, $dd - 1, $dd - 1)
+    $gd.DrawEllipse($whitePen, $dx, $dy, $dd - 1, $dd - 1)
+    $gd.Dispose(); $redBrush.Dispose(); $whitePen.Dispose()
+    $script:trayIconDot = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+} catch {}
+
 $script:notify = New-Object System.Windows.Forms.NotifyIcon
 $script:notify.Icon = $script:trayIcon
 $script:notify.Text = "Claude 사용량 위젯"
 $script:notify.Visible = $true
 
+# 자동 실행(레지스트리 Run) 설정값
+$script:autoRunKey  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$script:autoAppName = 'ClaudeWidget'
+$script:autoExe     = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+
 $script:trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $miShow = $script:trayMenu.Items.Add("열기")
 $miHide = $script:trayMenu.Items.Add("숨기기")
+[void]$script:trayMenu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+$miAuto = New-Object System.Windows.Forms.ToolStripMenuItem("Windows 시작 시 자동 실행")
+$miAuto.CheckOnClick = $true
+$miAuto.Checked = [bool](Get-ItemProperty -Path $script:autoRunKey -Name $script:autoAppName -ErrorAction SilentlyContinue)
+[void]$script:trayMenu.Items.Add($miAuto)
 [void]$script:trayMenu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 $miExit = $script:trayMenu.Items.Add("종료")
 $script:notify.ContextMenuStrip = $script:trayMenu
 
 $miShow.add_Click({ Show-Widget })
 $miHide.add_Click({ Hide-Widget })
+$miAuto.add_Click({
+    param($s, $e)
+    try {
+        if ($s.Checked) {
+            Set-ItemProperty -Path $script:autoRunKey -Name $script:autoAppName -Value ('"' + $script:autoExe + '"')
+        } else {
+            Remove-ItemProperty -Path $script:autoRunKey -Name $script:autoAppName -ErrorAction SilentlyContinue
+        }
+    } catch {}
+})
 $miExit.add_Click({ $script:win.Close() })
 # 트레이 아이콘 좌클릭 → 표시/숨김 토글
 $script:notify.add_MouseClick({
@@ -700,4 +752,8 @@ if ([System.Windows.Application]::Current) {
     $script:app = New-Object System.Windows.Application
 }
 $script:app.ShutdownMode = [System.Windows.ShutdownMode]::OnLastWindowClose
-[void]$script:app.Run($script:win)
+# 시작 시 창을 명시적으로 표시 (Run(win) 만으로는 트레이만 뜨고 창이 안 보일 수 있음)
+$script:win.Show()
+$script:win.Topmost = $true
+[void]$script:win.Activate()
+[void]$script:app.Run()
