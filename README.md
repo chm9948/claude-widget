@@ -17,7 +17,23 @@ Claude Code 사용량을 데스크톱에 띄워두는 Windows 플로팅 위젯.
 
 창은 드래그로 이동할 수 있고 항상 위(Topmost)에 떠 있습니다.
 
-## 실행
+## 간편 설치 (권장)
+
+PowerShell에 아래 한 줄을 붙여넣으면 끝납니다. 최신 exe를 `%LOCALAPPDATA%\ClaudeWidget`에 설치하고, 차단 해제(SmartScreen 경고 없음) + 시작메뉴 바로가기 생성 + 실행까지 한 번에 합니다. 관리자 권한 불필요.
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iex (irm 'https://raw.githubusercontent.com/chm9948/claude-widget/main/setup.ps1')"
+```
+
+제거:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "$ClaudeWidgetUninstall=$true; iex (irm 'https://raw.githubusercontent.com/chm9948/claude-widget/main/setup.ps1')"
+```
+
+> 자동 실행(Windows 시작 시)은 설치 후 트레이 아이콘 우클릭 메뉴에서 켤 수 있습니다.
+
+## 직접 다운로드 / 실행
 
 ```powershell
 # 소스 직접 실행
@@ -27,9 +43,8 @@ powershell -ExecutionPolicy Bypass -File claude-widget.ps1
 .\claude-widget.exe
 ```
 
-## 다운로드
-
-최신 실행 파일: **[claude-widget.exe](https://github.com/chm9948/claude-widget/raw/main/claude-widget.exe)** (main 기준 최신 버전)
+최신 실행 파일 직접 받기: **[claude-widget.exe](https://github.com/chm9948/claude-widget/raw/main/claude-widget.exe)** (main 기준 최신 버전)
+직접 받은 exe는 최초 1회 SmartScreen 차단 해제가 필요합니다(아래 참고). 간편 설치를 쓰면 이 과정이 생략됩니다.
 
 ## 최초 실행 안내 (중요)
 
