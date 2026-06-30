@@ -16,9 +16,23 @@ powershell -ExecutionPolicy Bypass -File claude-widget.ps1
 .\claude-widget.exe
 ```
 
+## Build & verify
+
+- Rebuild: `Invoke-ps2exe -inputFile claude-widget.ps1 -outputFile claude-widget.exe -noConsole -iconFile claude-widget.ico` — **must** pass `-iconFile` or the app/tray icon is lost.
+- Kill the running widget first (`Get-Process claude-widget | Stop-Process -Force`); ps2exe can't overwrite a running exe (Access denied).
+- Syntax-check before building: `[System.Management.Automation.Language.Parser]::ParseFile(path,[ref]$t,[ref]$e)`.
+- XAML/FindName/init errors do NOT show at syntax-check — launch the exe and confirm the process stays alive ~4 s.
+- On completion, copy `claude-widget.ps1` → `claude-widget.backup.ps1`.
+
+## Gotchas
+
+- The exe runs on **PowerShell 5.1 Desktop**; diagnostic shells are often PS7. `ConvertFrom-Json` parses ISO dates differently (PS5.1 keeps `…Z` as String; `+00:00` may become DateTime) — always `[DateTimeOffset]::Parse([string]$x)`.
+- PowerShell `[int]` **rounds**, not truncates — use `[math]::Floor` for hour/time math.
+- Running the `.ps1` directly needs STA: use `powershell` (5.1), not `pwsh` (PS7=MTA → WPF fails).
+
 ## Data Source
 
-Two sources, merged in the background runspace every 60 seconds:
+Two sources, merged in the background runspace every **5 minutes** (300 s; a manual refresh trigger wakes it sooner):
 
 1. **ccusage** — `npx ccusage@latest claude monthly --json` (monthly cost + model breakdown) and `... blocks --json` (active-block cost). Read from local `~/.claude/projects/**/*.jsonl`, so it only sees Claude Code CLI usage.
 2. **Anthropic usage API** — `GET https://api.anthropic.com/api/oauth/usage` with the OAuth `accessToken` from `~/.claude/.credentials.json` (header `anthropic-beta: oauth-2025-04-20`). Its `five_hour.resets_at` and `five_hour.utilization` are the exact values `/usage` shows, and they account for **all** clients (browser, desktop app), not just the CLI.
@@ -27,9 +41,19 @@ The runspace puts `apiBlockEndUtc` (from `five_hour.resets_at`) and `apiBlockPct
 
 > Why the API matters: the billing block starts at the first API call across *all* clients. JSONL only records CLI calls, so on days that start in the browser the JSONL-derived block end was up to ~1h late. The API is server-side truth and eliminates that error.
 
+The usage API result is cached across loop iterations: on failure (e.g. HTTP 429) the last good `apiBlockEndUtc`/`apiBlockPct` keep being shown instead of falling back to the divergent ccusage formula, with a 15-min backoff (other errors 5 min) before retrying.
+
+## Update check & distribution
+
+- **Version check**: once per hour the runspace fetches the repo's raw `CHANGELOG.md` and extracts the top `## [vX.Y.Z]` heading. If it's newer than `$script:appVersion`, `Update-Display` shows a red dot on the ⓘ button **and the tray icon** plus an "vX.Y.Z 로 업데이트" link in the ⓘ panel.
+- **One-click update**: clicking that link launches `setup.ps1` in a detached PowerShell (`iex (irm …/setup.ps1)`), which stops the running widget, re-downloads the latest exe to `%LOCALAPPDATA%\ClaudeWidget`, and relaunches.
+- **`setup.ps1`**: per-user installer (no admin). Downloads the exe (no Mark-of-the-Web → no SmartScreen), `Unblock-File`s it, creates a Start Menu shortcut, launches it. `$ClaudeWidgetUninstall=$true` before invoking runs uninstall (removes folder, shortcut, Run-key entry).
+- Auto-start is a `HKCU\…\Run` entry toggled from the tray right-click menu, not by the installer.
+
 ## Architecture
 
-- **Single-file WPF app** written in PowerShell. XAML is defined as an inline here-string and loaded with `XamlReader`.
+- **Single-file WPF app** written in PowerShell. XAML is defined as an inline here-string and loaded with `XamlReader`. Started via `Application.Run()` (not `ShowDialog()`, which blocks `Show`/`Hide` needed for the tray). The window is shown explicitly on startup; `ShowInTaskbar=False`.
+- **System tray** uses WinForms `NotifyIcon` (`Add-Type System.Windows.Forms`/`System.Drawing`). Left-click toggles show/hide, right-click menu = 열기/숨기기/자동실행/종료, header ✕ hides to tray (only the menu's 종료 closes the window → app exit). The "update available" red-dot variant icon is drawn at runtime from the base icon. `NotifyIcon` is disposed in the window's `Closed` handler.
 - **Two timers on the UI thread**: `$script:pollTimer` (2 s) drains the queue and calls `Update-Display`; `$script:countdownTimer` (1 s) updates the footer countdown and block time-remaining live.
 - **Background runspace** (`$script:bgRunspace`) runs `ccusage` + the usage API call in a loop and enqueues merged JSON. It never touches UI elements directly. The OAuth token is re-read from `.credentials.json` on every iteration so token refreshes by a running Claude Code are picked up automatically.
 - **Themes** (`$script:themes`) are plain hashtables (`light`/`dark`) applied via `Apply-Theme`, which re-colors all named WPF elements and re-renders model rows through `Update-Display`.
