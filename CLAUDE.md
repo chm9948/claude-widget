@@ -50,9 +50,19 @@ The usage API result is cached across loop iterations: on failure (e.g. HTTP 429
 - **`setup.ps1`**: per-user installer (no admin). Downloads the exe (no Mark-of-the-Web → no SmartScreen), `Unblock-File`s it, creates a Start Menu shortcut, launches it. `$ClaudeWidgetUninstall=$true` before invoking runs uninstall (removes folder, shortcut, Run-key entry).
 - Auto-start is a `HKCU\…\Run` entry toggled from the tray right-click menu, not by the installer.
 
+## Release flow
+
+The committed `claude-widget.exe` on `main` **is** the distribution — `setup.ps1` and the one-click updater both download it from the raw `main` URL. To release:
+
+1. Bump `$script:appVersion` in `claude-widget.ps1`.
+2. Add a matching `## [vX.Y.Z] - YYYY-MM-DD` entry at the **top** of `CHANGELOG.md` (Keep a Changelog style, KST dates) — the update check compares against this heading, so it must equal `$script:appVersion` exactly.
+3. Rebuild the exe and commit script + CHANGELOG + exe **together**: pushing the CHANGELOG bump without the rebuilt exe makes every running widget show an update that installs the old version.
+
 ## Architecture
 
 - **Single-file WPF app** written in PowerShell. XAML is defined as an inline here-string and loaded with `XamlReader`. Started via `Application.Run()` (not `ShowDialog()`, which blocks `Show`/`Hide` needed for the tray). The window is shown explicitly on startup; `ShowInTaskbar=False`.
+- **Named-element binding**: every `x:Name` in the XAML must also be listed in the `foreach` FindName block near the top of the script, which auto-creates a matching camelCase `$script:` variable (e.g. `BlockPct` → `$script:blockPct`). Adding a named element without registering it there silently yields `$null` (caught only by launching the exe, not by syntax check).
+- **Repo constants**: `$script:repoOwner`/`$script:repoName` at the top of the script derive the GitHub/raw URLs used by the update check, issue link, and one-click updater — nothing else hardcodes the repo (except `setup.ps1`, which has its own URL).
 - **System tray** uses WinForms `NotifyIcon` (`Add-Type System.Windows.Forms`/`System.Drawing`). Left-click toggles show/hide, right-click menu = 열기/숨기기/자동실행/종료, header ✕ hides to tray (only the menu's 종료 closes the window → app exit). The "update available" red-dot variant icon is drawn at runtime from the base icon. `NotifyIcon` is disposed in the window's `Closed` handler.
 - **Two timers on the UI thread**: `$script:pollTimer` (2 s) drains the queue and calls `Update-Display`; `$script:countdownTimer` (1 s) updates the footer countdown and block time-remaining live.
 - **Background runspace** (`$script:bgRunspace`) runs `ccusage` + the usage API call in a loop and enqueues merged JSON. It never touches UI elements directly. The OAuth token is re-read from `.credentials.json` on every iteration so token refreshes by a running Claude Code are picked up automatically.

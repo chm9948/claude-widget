@@ -6,6 +6,10 @@ claude-widget.zip
 # Claude Code 로컬 설정/상태
 .claude/
 
+# Python
+__pycache__/
+*.pyc
+
 # OS / 편집기
 Thumbs.db
 Desktop.ini

@@ -41,6 +41,11 @@ powershell -ExecutionPolicy Bypass -Command "$ClaudeWidgetUninstall=$true; iex (
 
 > 직접 받은 exe는 서명이 없어 최초 1회 SmartScreen이 막을 수 있습니다 → **추가 정보 → 실행**, 또는 파일 우클릭 → 속성 → **차단 해제**. (설치 스크립트를 쓰면 생략됩니다.)
 
+## macOS (메뉴바)
+
+맥에서는 SwiftBar 플러그인 버전을 쓸 수 있습니다. 메뉴바에 이번 달 비용과 현재 블록 사용률을 표시합니다.
+설치·사용법은 **[macos/README.md](macos/README.md)** 참고.
+
 ## 만든이
 
 최현민 · 문의: hmchoi@page1.co.kr · GxP Page1
