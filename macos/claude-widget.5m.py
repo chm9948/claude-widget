@@ -15,7 +15,7 @@
 1. ccusage — 월 누적 비용/모델별 분해, 활성 블록 비용
 2. Anthropic usage API — five_hour.utilization / five_hour.resets_at (서버측 진실값)
    실패 시 마지막 성공값 캐시 사용 (429 는 15분, 기타 5분 백오프).
-   캐시가 아예 없을 때만 ccusage 폴백 공식 사용.
+   캐시에 없는 필드만 ccusage endTime / 폴백 공식으로 채움 (필드별 폴백).
 """
 
 import json
@@ -91,6 +91,8 @@ def format_remaining(end_dt, now=None):
     end_local = end_dt.astimezone().strftime("%H:%M")
     if hours > 0:
         return "{}시간 {}분 남음 ({} 종료)".format(hours, mins, end_local)
+    if mins == 0:
+        return "1분 미만 남음 ({} 종료)".format(end_local)
     return "{}분 남음 ({} 종료)".format(mins, end_local)
 
 
@@ -192,8 +194,11 @@ def load_cache():
 def save_cache(cache):
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        # 원자적 쓰기: 수동 새로고침과 정기 실행이 겹쳐도 파일이 잘리지 않도록
+        tmp = CACHE_FILE + ".tmp.{}".format(os.getpid())
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache, f)
+        os.replace(tmp, CACHE_FILE)
     except Exception:
         pass  # 캐시 저장 실패는 치명적이지 않음
 
@@ -202,9 +207,11 @@ def resolve_block(active_block, now=None):
     """블록 종료시각/진행률 결정 (윈도우판 로직의 파일 기반 포팅).
 
     반환: {"pct": float|None, "end": datetime|None, "source": "api"|"ccusage"} 또는 None.
-    - 백오프 중이 아니면 API 호출; 성공 시 캐시 갱신, 실패 시 429/rate=15분·기타 5분 백오프.
-    - 캐시값이 있으면 (실패 시에도) 캐시 사용.
-    - 캐시가 아예 없을 때만 ccusage 폴백 공식 사용.
+    - 백오프 중이 아니면 API 호출; 성공 시 값이 있는 필드만 캐시 갱신,
+      실패 시 429/rate=15분·기타 5분 백오프.
+    - 필드별 폴백 (윈도우판 동일): end 는 캐시값이 없거나 이미 지났으면 ccusage
+      endTime, pct 는 캐시값이 없으면 폴백 공식. source 는 폴백이 하나라도
+      쓰였으면 "ccusage".
     """
     now = now or datetime.now(timezone.utc)
     cache = load_cache()
@@ -216,7 +223,13 @@ def resolve_block(active_block, now=None):
             if not token:
                 raise RuntimeError("no oauth token")
             pct, end_iso = fetch_usage_api(token)
-            cache = {"cachedEndIso": end_iso, "cachedPct": pct, "apiBlockedUntilIso": None}
+            # 값이 실제로 있을 때만 갱신 (윈도우판 동일) — null 필드 응답이
+            # 마지막 성공값을 지우지 않도록 기존 캐시 필드는 보존한다.
+            if end_iso:
+                cache["cachedEndIso"] = end_iso
+            if pct is not None:
+                cache["cachedPct"] = pct
+            cache["apiBlockedUntilIso"] = None
             save_cache(cache)
         except Exception as e:
             msg = str(e).lower()
@@ -224,22 +237,34 @@ def resolve_block(active_block, now=None):
             cache["apiBlockedUntilIso"] = (now + timedelta(minutes=mins)).isoformat()
             save_cache(cache)
 
-    if cache.get("cachedEndIso") is not None or cache.get("cachedPct") is not None:
-        return {
-            "pct": cache.get("cachedPct"),
-            "end": parse_iso(cache.get("cachedEndIso")),
-            "source": "api",
-        }
+    # 필드별 병합 (윈도우판 동일): 캐시값 우선, 필드가 비면 그 필드만 ccusage 폴백.
+    pct = cache.get("cachedPct")
+    end = parse_iso(cache.get("cachedEndIso"))
 
-    # 캐시가 아예 없을 때만 ccusage 폴백
+    used_fallback = False
     if active_block:
-        tokens = active_block.get("totalTokens") or 0
-        cost = active_block.get("costUSD") or 0
-        pct = max(tokens / FALLBACK_TOKEN_LIMIT, cost / FALLBACK_COST_LIMIT) * 100
-        pct = max(0.0, min(100.0, pct))
-        return {"pct": pct, "end": parse_iso(active_block.get("endTime")), "source": "ccusage"}
+        # end: 캐시값이 없거나 이미 지났으면 ccusage endTime 으로 폴백
+        # (API 장기 실패 중 새 블록이 시작된 경우에도 블록을 표시하기 위함)
+        if end is None or end <= now:
+            cc_end = parse_iso(active_block.get("endTime"))
+            if cc_end is not None:
+                end = cc_end
+                used_fallback = True
+        # pct: 캐시값이 없으면 폴백 공식으로 계산
+        if pct is None:
+            tokens = active_block.get("totalTokens") or 0
+            cost = active_block.get("costUSD") or 0
+            pct = max(tokens / FALLBACK_TOKEN_LIMIT, cost / FALLBACK_COST_LIMIT) * 100
+            used_fallback = True
 
-    return None
+    if pct is None and end is None:
+        return None
+
+    if pct is not None:
+        # API/캐시 경로 포함 항상 0-100 클램프 (윈도우판 동일)
+        pct = max(0.0, min(100.0, float(pct)))
+
+    return {"pct": pct, "end": end, "source": "ccusage" if used_fallback else "api"}
 
 
 # ---------------------------------------------------------------- 출력 (SwiftBar 형식)
@@ -325,7 +350,7 @@ def main():
     except Exception:
         pass
 
-    # 블록 종료/진행률: API(캐시/백오프) 우선, 캐시 없을 때만 ccusage 폴백
+    # 블록 종료/진행률: API(캐시/백오프) 우선, 빈 필드만 ccusage 로 폴백
     try:
         block = resolve_block(active_block)
     except Exception:

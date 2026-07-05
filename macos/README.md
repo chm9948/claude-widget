@@ -6,6 +6,7 @@
 ## 요구 사항
 
 - macOS + [SwiftBar](https://swiftbar.app) (`brew install --cask swiftbar`)
+- `python3` — Xcode Command Line Tools 로 설치 (`xcode-select --install`)
 - Node.js / `npx` — 비용 데이터(`ccusage`) 조회용
 - 로그인된 Claude Code — 사용량 API 토큰을 macOS 키체인의 `Claude Code-credentials` 항목에서 읽습니다 (일부 환경은 `~/.claude/.credentials.json` 폴백)
 
@@ -32,7 +33,7 @@ Windows 위젯과 동일한 로직을 사용하며 5분마다 갱신합니다.
 1. **ccusage** — `npx ccusage@latest claude monthly --json` / `... blocks --json`. 로컬 `~/.claude/projects/**/*.jsonl`에서 읽으므로 Claude Code CLI 사용량만 집계 (이번 달 비용 + 모델별 비용, 활성 블록 비용)
 2. **Anthropic usage API** — `GET https://api.anthropic.com/api/oauth/usage` (키체인의 OAuth 토큰 사용). `five_hour.utilization`(사용률 %)과 `five_hour.resets_at`(블록 종료 시각)은 `/usage`가 보여주는 값 그대로이며, CLI뿐 아니라 브라우저·데스크톱 앱 등 **모든 클라이언트**의 사용량을 반영하는 서버 측 기준값입니다
 
-블록 사용률/종료 시각은 API 값을 우선 사용합니다. API 호출이 실패하면 마지막 성공값을 캐시(`~/.cache/claude-widget/`)에서 계속 표시하고(429는 15분, 기타 오류는 5분 백오프 후 재시도), 캐시조차 없을 때만 ccusage `endTime`과 폴백 공식 `max(tokens/20,446,221, cost/$13.44)`를 사용합니다.
+블록 사용률/종료 시각은 API 값을 우선 사용합니다. API 호출이 실패하면 마지막 성공값을 캐시(`~/.cache/claude-widget/`)에서 계속 표시하고(429는 15분, 기타 오류는 5분 백오프 후 재시도), 캐시에 없는(또는 이미 지난) 필드만 ccusage `endTime`과 폴백 공식 `max(tokens/20,446,221, cost/$13.44)`로 채웁니다.
 
 ## 제거
 
